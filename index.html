@@ -170,7 +170,7 @@
       
       // サポートされるバーコード形式をログ出力
       if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
-        addDebugLog('対応バーコード形式: QRコード, Code128, Code39, EAN13, GS1データバー等');
+        addDebugLog('対応バーコード形式: QRコード, Code128, Code39, EAN13, GS1データバー全種類（限定版含む）');
       }
       
       return true;
@@ -307,7 +307,11 @@
             Html5QrcodeSupportedFormats.PDF_417,
             Html5QrcodeSupportedFormats.MAXICODE,
             Html5QrcodeSupportedFormats.RSS_14,        // GS1 DataBar (Omnidirectional)
-            Html5QrcodeSupportedFormats.RSS_EXPANDED  // GS1 DataBar Expanded
+            Html5QrcodeSupportedFormats.RSS_EXPANDED,  // GS1 DataBar Expanded
+            Html5QrcodeSupportedFormats.RSS_LIMITED,   // GS1 DataBar Limited ← 追加
+            Html5QrcodeSupportedFormats.RSS_STACKED,   // GS1 DataBar Stacked ← 追加
+            Html5QrcodeSupportedFormats.RSS_STACKED_OMNIDIRECTIONAL, // GS1 DataBar Stacked Omnidirectional ← 追加
+            Html5QrcodeSupportedFormats.RSS_EXPANDED_STACKED // GS1 DataBar Expanded Stacked ← 追加
           ]
         };
 
