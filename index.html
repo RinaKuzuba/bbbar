@@ -24,17 +24,19 @@
     #debug {
       background: #f0f0f0;
       border: 1px solid #ccc;
-      padding: 1rem;
+      padding: 0.8rem;
       margin-bottom: 1rem;
       border-radius: 4px;
       white-space: pre-wrap;
-      font-size: 0.9rem;
+      font-size: 0.8rem;
+      max-height: 200px;
+      overflow-y: auto;
     }
     /* カメラ映像を表示するエリア */
     #reader {
       width: 100%;
       max-width: 400px;
-      height: 400px;
+      height: 300px;
       margin: 1rem auto;
       border: 1px solid #ddd;
       border-radius: 4px;
@@ -84,16 +86,22 @@
     button {
       display: block;
       margin: 1rem auto;
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
+      padding: 0.8rem 1.5rem;
+      font-size: 1.1rem;
       background: #007bff;
       color: white;
       border: none;
-      border-radius: 4px;
+      border-radius: 8px;
       cursor: pointer;
+      width: 200px;
+      max-width: 90%;
     }
     button:hover {
       background: #0056b3;
+    }
+    button:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
     }
   </style>
 </head>
