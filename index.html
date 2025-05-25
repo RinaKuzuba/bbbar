@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>リアルタイムバーコード照合（デバッグ版）</title>
+  <title>リアルタイムバーコード照合（QR＆GS1限定型）</title>
   <!-- HTML5-QRCode ライブラリ (複数のCDNでフォールバック) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" 
-          integrity="sha512-r6rDA7W6ZeQhvl8S7yRVQUKVHdexq+GAlNkNNqVC7YyIV+NwqCTJe2hDWCiffTyRNOeGEzRRJ9ifvRm/HCzGYg==" 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"
+          integrity="sha512-r6rDA7W6ZeQhvl8S7yRVQUKVHdexq+GAlNkNNqVC7YyIV+NwqCTJe2hDWCiffTyRNOeGEzRRJ9ifvRm/HCzGYg=="
           crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script>
     // フォールバック用：最初のCDNが失敗した場合
@@ -20,7 +20,6 @@
       margin: 1rem;
       padding: 0;
     }
-    /* デバッグ情報表示エリア */
     #debug {
       background: #f0f0f0;
       border: 1px solid #ccc;
@@ -32,7 +31,6 @@
       max-height: 200px;
       overflow-y: auto;
     }
-    /* カメラ映像を表示するエリア */
     #reader {
       width: 100%;
       max-width: 400px;
@@ -42,7 +40,6 @@
       border-radius: 4px;
       overflow: hidden;
     }
-    /* ステータス表示 */
     .status {
       text-align: center;
       font-size: 1.2rem;
@@ -50,14 +47,12 @@
     }
     .status.ok { color: green; }
     .status.ng { color: red; }
-    /* 読み取り値 */
     .values {
       text-align: center;
       margin-top: 0.5rem;
       font-size: 1rem;
     }
     .values p { margin: 0.25rem 0; }
-    /* オーバーレイ表示 */
     #overlay {
       display: none;
       position: fixed;
@@ -71,18 +66,15 @@
       padding: 2rem;
       box-sizing: border-box;
     }
-    /* バーコード表示時 */
     #overlay.barcode {
       font-size: 2rem;
       color: #333;
       background: rgba(0, 123, 255, 0.9);
       color: white;
     }
-    /* 照合結果表示時 */
     #overlay.result {
       font-size: 8rem;
     }
-    /* ボタン */
     button {
       display: block;
       margin: 1rem auto;
@@ -96,9 +88,7 @@
       width: 200px;
       max-width: 90%;
     }
-    button:hover {
-      background: #0056b3;
-    }
+    button:hover { background: #0056b3; }
     button:disabled {
       background: #6c757d;
       cursor: not-allowed;
@@ -106,286 +96,178 @@
   </style>
 </head>
 <body>
-  <!-- デバッグ情報表示 -->
   <div id="debug">デバッグ情報を表示中...</div>
-  
-  <!-- 手動開始ボタン -->
   <button id="startBtn">カメラを開始</button>
-  
-  <!-- カメラ映像エリア -->
   <div id="reader"></div>
-  
-  <!-- 操作ステータス -->
   <div id="status" class="status">カメラを開始してください</div>
-  
-  <!-- 読み取り値の表示 -->
   <div class="values">
     <p>バーコード①：<span id="code1">—</span></p>
     <p>バーコード②：<span id="code2">—</span></p>
   </div>
-  
-  <!-- 〇／× オーバーレイ -->
   <div id="overlay"></div>
 
   <script>
-    let code1 = null;
-    let code2 = null;
-    let html5QrCode = null;
-    let isScanning = false;
-    
-    const statusEl  = document.getElementById('status');
-    const code1El   = document.getElementById('code1');
-    const code2El   = document.getElementById('code2');
-    const overlayEl = document.getElementById('overlay');
-    const debugEl   = document.getElementById('debug');
-    const startBtn  = document.getElementById('startBtn');
+    let code1 = null, code2 = null, html5QrCode = null, isScanning = false;
+    const statusEl = document.getElementById('status');
+    const code1El  = document.getElementById('code1');
+    const code2El  = document.getElementById('code2');
+    const overlayEl= document.getElementById('overlay');
+    const debugEl  = document.getElementById('debug');
+    const startBtn = document.getElementById('startBtn');
 
-    // デバッグログ関数
-    function addDebugLog(message) {
-      const timestamp = new Date().toLocaleTimeString();
-      debugEl.textContent += `[${timestamp}] ${message}\n`;
+    function addDebugLog(msg) {
+      const t = new Date().toLocaleTimeString();
+      debugEl.textContent += `[${t}] ${msg}\n`;
       debugEl.scrollTop = debugEl.scrollHeight;
-      console.log(message);
+      console.log(msg);
     }
 
-    // 初期化時の環境チェック
     function checkEnvironment() {
       addDebugLog('=== 環境チェック開始 ===');
-      addDebugLog(`URL: ${window.location.href}`);
-      addDebugLog(`プロトコル: ${window.location.protocol}`);
-      addDebugLog(`ユーザーエージェント: ${navigator.userAgent}`);
-      
-      // HTTPS チェック
-      if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-        addDebugLog('警告: HTTPSではありません。カメラが動作しない可能性があります。');
+      addDebugLog(`URL: ${location.href}`);
+      addDebugLog(`プロトコル: ${location.protocol}`);
+      addDebugLog(`UA: ${navigator.userAgent}`);
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        addDebugLog('警告: HTTPSではありません。');
       }
-      
-      // getUserMedia サポートチェック
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        addDebugLog('エラー: getUserMediaがサポートされていません');
+      if (!navigator.mediaDevices?.getUserMedia) {
+        addDebugLog('エラー: getUserMedia未サポート');
         return false;
       }
-      
-      addDebugLog('getUserMediaは利用可能です');
-      
-      // サポートされるバーコード形式をログ出力
-      if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
-        addDebugLog('対応バーコード形式: QRコード, Code128, Code39, EAN13, GS1データバー全種類（限定版含む）');
-      }
-      
+      addDebugLog('getUserMedia利用可');
       return true;
     }
 
-    // カメラデバイス一覧取得
     async function listCameras() {
       try {
-        addDebugLog('カメラデバイスを検索中...');
+        addDebugLog('カメラ検出中...');
         const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(device => device.kind === 'videoinput');
-        
-        addDebugLog(`検出されたカメラ数: ${videoDevices.length}`);
-        videoDevices.forEach((device, index) => {
-          addDebugLog(`  カメラ${index + 1}: ${device.label || 'Unknown Camera'} (ID: ${device.deviceId})`);
-        });
-        
-        return videoDevices;
-      } catch (error) {
-        addDebugLog(`カメラ検索エラー: ${error.message}`);
+        const cams = devices.filter(d => d.kind === 'videoinput');
+        addDebugLog(`検出: ${cams.length}台`);
+        cams.forEach((c,i)=> addDebugLog(`  カメラ${i+1}: ${c.label||'Unknown'} (ID:${c.deviceId})`));
+        return cams;
+      } catch(e) {
+        addDebugLog(`カメラ検出エラー: ${e}`);
         return [];
       }
     }
 
-    // 変数と画面表示をリセット
     function resetAll() {
       code1 = code2 = null;
-      code1El.textContent = '—';
-      code2El.textContent = '—';
+      code1El.textContent = code2El.textContent = '—';
       statusEl.textContent = '１回目のスキャンをしてください';
       statusEl.className = 'status';
     }
 
-    // バーコード内容を1秒間表示
-    function showBarcodeContent(content, isFirstScan) {
+    function showBarcodeContent(content, first) {
       overlayEl.textContent = content;
       overlayEl.className = 'barcode';
       overlayEl.style.display = 'flex';
-      
-      addDebugLog(`${isFirstScan ? '1回目' : '2回目'}のバーコード内容を表示: ${content}`);
-      
-      setTimeout(() => {
-        overlayEl.style.display = 'none';
-        overlayEl.className = '';
-        
-        if (!isFirstScan) {
-          // 2回目の場合は、少し間を置いてから照合結果を表示
-          setTimeout(() => {
-            const isMatch = code1 === code2;
-            addDebugLog(`照合結果: ${isMatch ? '一致' : '不一致'}`);
-            showResult(isMatch);
-          }, 200);
+      addDebugLog((first?'1回目':'2回目') + `表示: ${content}`);
+      setTimeout(()=>{
+        overlayEl.style.display='none';
+        if (!first) {
+          setTimeout(()=>{
+            const match = code1===code2;
+            addDebugLog(`照合: ${match?'一致':'不一致'}`);
+            showResult(match);
+          },200);
         }
-      }, 1000);
+      },1000);
     }
 
-    // 結果を大きく表示して、2秒後にリセット
-    function showResult(isMatch) {
-      overlayEl.textContent = isMatch ? '〇' : '×';
+    function showResult(match) {
+      overlayEl.textContent = match ? '〇' : '×';
       overlayEl.className = 'result';
-      overlayEl.style.color = isMatch ? 'green' : 'red';
+      overlayEl.style.color = match ? 'green' : 'red';
       overlayEl.style.display = 'flex';
-      setTimeout(() => {
-        overlayEl.style.display = 'none';
-        overlayEl.className = '';
+      setTimeout(()=>{
+        overlayEl.style.display='none';
         resetAll();
-      }, 2000);
+      },2000);
     }
 
-    // スキャン成功時のコールバック
-    function onScanSuccess(decodedText) {
-      addDebugLog(`バーコード読み取り: ${decodedText}`);
-      
+    function onScanSuccess(text) {
+      addDebugLog(`読み取り成功: ${text}`);
       if (code1 === null) {
-        code1 = decodedText;
-        code1El.textContent = code1;
+        code1 = text; code1El.textContent = text;
         statusEl.textContent = '２回目のスキャンをしてください';
-        addDebugLog('1回目のスキャン完了');
-        
-        // 1回目のバーコード内容を1秒間表示
-        showBarcodeContent(decodedText, true);
-        
+        addDebugLog('1回目完了');
+        showBarcodeContent(text, true);
       } else if (code2 === null) {
-        code2 = decodedText;
-        code2El.textContent = code2;
-        addDebugLog('2回目のスキャン完了');
-        
-        // 2回目のバーコード内容を1秒間表示してから照合結果表示
-        showBarcodeContent(decodedText, false);
+        code2 = text; code2El.textContent = text;
+        addDebugLog('2回目完了');
+        showBarcodeContent(text, false);
       }
     }
 
-    // スキャンエラー時のコールバック（ログのみ、エラー表示しない）
-    function onScanFailure(error) {
-      // 読み取り失敗は頻繁に発生するため、詳細ログは出さない
+    function onScanFailure(err) {
+      addDebugLog(`読み取り失敗: ${err}`);
     }
 
-    // カメラ開始
     async function startScanner() {
-      if (isScanning) {
-        addDebugLog('既にスキャン中です');
-        return;
-      }
-
+      if (isScanning) return addDebugLog('既にスキャン中');
       try {
-        addDebugLog('カメラ開始処理を開始...');
-        
+        addDebugLog('スキャン開始...');
         if (!html5QrCode) {
           html5QrCode = new Html5Qrcode('reader');
-          addDebugLog('Html5Qrcodeインスタンスを作成');
+          addDebugLog('Html5Qrcode生成');
         }
-
-        // カメラ設定（GS1データバー限定型を含む全バーコード対応）
+        // ==== ここをQR & GS1限定型に絞る ====
         const config = {
-          fps: 10,
+          fps: 12,
           qrbox: { width: 300, height: 300 },
-          aspectRatio: 1.0,
-          supportedScanTypes: [
-            Html5QrcodeScanType.SCAN_TYPE_CAMERA
-          ],
           formatsToSupport: [
             Html5QrcodeSupportedFormats.QR_CODE,
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.CODE_93,
-            Html5QrcodeSupportedFormats.CODABAR,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.ITF,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.DATA_MATRIX,
-            Html5QrcodeSupportedFormats.AZTEC,
-            Html5QrcodeSupportedFormats.PDF_417,
-            Html5QrcodeSupportedFormats.MAXICODE,
-            Html5QrcodeSupportedFormats.RSS_14,        // GS1 DataBar (Omnidirectional)
-            Html5QrcodeSupportedFormats.RSS_EXPANDED,  // GS1 DataBar Expanded
-            Html5QrcodeSupportedFormats.RSS_LIMITED,   // GS1 DataBar Limited ← 追加
-            Html5QrcodeSupportedFormats.RSS_STACKED,   // GS1 DataBar Stacked ← 追加
-            Html5QrcodeSupportedFormats.RSS_STACKED_OMNIDIRECTIONAL, // GS1 DataBar Stacked Omnidirectional ← 追加
-            Html5QrcodeSupportedFormats.RSS_EXPANDED_STACKED // GS1 DataBar Expanded Stacked ← 追加
-          ]
+            Html5QrcodeSupportedFormats.RSS_LIMITED
+          ],
+          verbose: false
         };
-
-        addDebugLog('カメラ起動中...');
+        addDebugLog('カメラ起動...');
         startBtn.disabled = true;
         startBtn.textContent = '起動中...';
-
-        // 背面カメラを優先
         await html5QrCode.start(
           { facingMode: 'environment' },
           config,
           onScanSuccess,
           onScanFailure
         );
-
         isScanning = true;
-        addDebugLog('カメラが正常に起動しました');
+        addDebugLog('起動成功');
         statusEl.textContent = '１回目のスキャンをしてください';
-        statusEl.className = 'status';
+        statusEl.className = 'status ok';
         startBtn.style.display = 'none';
         resetAll();
-
-      } catch (error) {
-        addDebugLog(`カメラ起動エラー: ${error.message}`);
-        
-        // 詳細なエラー情報を表示
-        if (error.name === 'NotAllowedError') {
-          addDebugLog('カメラの使用が拒否されました。ブラウザの設定でカメラアクセスを許可してください。');
-        } else if (error.name === 'NotFoundError') {
-          addDebugLog('カメラが見つかりません。デバイスにカメラが接続されていることを確認してください。');
-        } else if (error.name === 'NotSupportedError') {
-          addDebugLog('このブラウザまたはデバイスではカメラがサポートされていません。');
-        }
-
-        statusEl.textContent = `カメラエラー: ${error.message}`;
+      } catch (e) {
+        addDebugLog(`起動エラー: ${e.message}`);
+        statusEl.textContent = `カメラエラー: ${e.message}`;
         statusEl.className = 'status ng';
         startBtn.disabled = false;
         startBtn.textContent = 'カメラを開始';
       }
     }
 
-    // ページロード時の初期化
     window.addEventListener('load', async () => {
-      addDebugLog('ページ読み込み完了');
-      
-      // ライブラリの読み込みチェック
+      addDebugLog('ページロード完了');
       if (typeof Html5Qrcode === 'undefined') {
-        addDebugLog('エラー: Html5Qrcodeライブラリが読み込まれていません');
+        addDebugLog('ライブラリ未ロード');
         statusEl.textContent = 'ライブラリ読み込みエラー';
         statusEl.className = 'status ng';
         return;
-      } else {
-        addDebugLog('Html5Qrcodeライブラリが正常に読み込まれました');
       }
-      
+      addDebugLog('ライブラリ正常');
       if (!checkEnvironment()) {
-        statusEl.textContent = 'お使いのブラウザはカメラをサポートしていません';
+        statusEl.textContent = 'ブラウザ未対応';
         statusEl.className = 'status ng';
         return;
       }
-
       await listCameras();
-      
-      // ボタンイベント設定
       startBtn.addEventListener('click', startScanner);
-      
-      addDebugLog('初期化完了。「カメラを開始」ボタンを押してください。');
+      addDebugLog('初期化完了');
     });
 
-    // ページ終了時のクリーンアップ
     window.addEventListener('beforeunload', () => {
-      if (html5QrCode && isScanning) {
-        html5QrCode.stop();
-      }
+      if (html5QrCode && isScanning) html5QrCode.stop();
     });
   </script>
 </body>
