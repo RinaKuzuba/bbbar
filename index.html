@@ -4,8 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>リアルタイムバーコード照合（デバッグ版）</title>
-  <!-- HTML5-QRCode ライブラリ -->
-  <script src="https://unpkg.com/html5-qrcode@2.3.5/minified/html5-qrcode.min.js"></script>
+  <!-- HTML5-QRCode ライブラリ (複数のCDNでフォールバック) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" 
+          integrity="sha512-r6rDA7W6ZeQhvl8S7yRVQUKVHdexq+GAlNkNNqVC7YyIV+NwqCTJe2hDWCiffTyRNOeGEzRRJ9ifvRm/HCzGYg==" 
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script>
+    // フォールバック用：最初のCDNが失敗した場合
+    if (typeof Html5Qrcode === 'undefined') {
+      document.write('<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"><\/script>');
+    }
+  </script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -265,6 +273,16 @@
     // ページロード時の初期化
     window.addEventListener('load', async () => {
       addDebugLog('ページ読み込み完了');
+      
+      // ライブラリの読み込みチェック
+      if (typeof Html5Qrcode === 'undefined') {
+        addDebugLog('エラー: Html5Qrcodeライブラリが読み込まれていません');
+        statusEl.textContent = 'ライブラリ読み込みエラー';
+        statusEl.className = 'status ng';
+        return;
+      } else {
+        addDebugLog('Html5Qrcodeライブラリが正常に読み込まれました');
+      }
       
       if (!checkEnvironment()) {
         statusEl.textContent = 'お使いのブラウザはカメラをサポートしていません';
