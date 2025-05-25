@@ -2,32 +2,70 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>リアルタイムバーコード照合</title>
+
+  <!-- HTML5-QRCode ライブラリ -->
   <script src="https://unpkg.com/html5-qrcode@2.3.5/minified/html5-qrcode.min.js"></script>
+
   <style>
-    #reader { width: 100%; max-width: 400px; margin: auto; }
-    .status { text-align: center; font-size: 1.2rem; margin-top: 1rem; }
-    .values { text-align: center; margin-top: 0.5rem; font-size: 1rem; }
+    /* カメラ映像を表示するエリア */
+    #reader {
+      width: 100%;
+      max-width: 400px;
+      height: 400px;      /* ← 高さを確保 */
+      margin: 1rem auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    /* ステータス表示 */
+    .status {
+      text-align: center;
+      font-size: 1.2rem;
+      margin-top: 1rem;
+    }
+    .status.ok { color: green; }
+    .status.ng { color: red; }
+
+    /* 読み取り値 */
+    .values {
+      text-align: center;
+      margin-top: 0.5rem;
+      font-size: 1rem;
+    }
     .values p { margin: 0.25rem 0; }
+
+    /* 照合結果オーバーレイ */
     #overlay {
       display: none;
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(255,255,255,0.7);
+      background: rgba(255, 255, 255, 0.8);
+      display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 10rem;
+      font-size: 8rem;
       z-index: 999;
     }
   </style>
 </head>
+
 <body>
+  <!-- カメラ映像エリア -->
   <div id="reader"></div>
+
+  <!-- 操作ステータス -->
   <div id="status" class="status">１回目のスキャンをしてください</div>
+
+  <!-- 読み取り値の表示 -->
   <div class="values">
     <p>バーコード①：<span id="code1">—</span></p>
     <p>バーコード②：<span id="code2">—</span></p>
   </div>
+
+  <!-- 〇／× オーバーレイ -->
   <div id="overlay"></div>
 
   <script>
@@ -39,27 +77,27 @@
     const code2El   = document.getElementById('code2');
     const overlayEl = document.getElementById('overlay');
 
+    // 変数と画面表示をリセット
     function resetAll() {
-      // 変数クリア
-      code1 = null;
-      code2 = null;
-      // 画面表示クリア
+      code1 = code2 = null;
       code1El.textContent = '—';
       code2El.textContent = '—';
       statusEl.textContent = '１回目のスキャンをしてください';
+      statusEl.className = 'status';
     }
 
+    // 結果を大きく表示して、2秒後にリセット
     function showResult(isMatch) {
       overlayEl.textContent = isMatch ? '〇' : '×';
       overlayEl.style.color = isMatch ? 'green' : 'red';
       overlayEl.style.display = 'flex';
-      // 2秒後にオーバーレイを消し、変数と表示をクリア
       setTimeout(() => {
         overlayEl.style.display = 'none';
-        resetAll();  // ←ここで code1, code2 と UI をクリア
+        resetAll();
       }, 2000);
     }
 
+    // スキャン成功時のコールバック
     function onScanSuccess(decodedText) {
       if (code1 === null) {
         code1 = decodedText;
@@ -68,22 +106,22 @@
       } else if (code2 === null) {
         code2 = decodedText;
         code2El.textContent = code2;
-        // 照合して結果表示
         showResult(code1 === code2);
       }
     }
 
+    // HTML5-QRCode を起動
     const html5QrCode = new Html5Qrcode('reader');
     html5QrCode.start(
       { facingMode: 'environment' },
       { fps: 10, qrbox: { width: 300, height: 300 } },
-      (decodedText, decodedResult) => { onScanSuccess(decodedText); }
+      (text) => onScanSuccess(text)
     ).catch(err => {
       statusEl.textContent = `カメラ起動エラー：${err}`;
       statusEl.className = 'status ng';
     });
 
-    // ページ読み込み時に初期化
+    // ページ読み込み時リセット
     resetAll();
   </script>
 </body>
