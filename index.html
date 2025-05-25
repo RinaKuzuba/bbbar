@@ -68,7 +68,6 @@
     }
     #overlay.barcode {
       font-size: 2rem;
-      color: #333;
       background: rgba(0, 123, 255, 0.9);
       color: white;
     }
@@ -96,25 +95,46 @@
   </style>
 </head>
 <body>
+  <!-- デバッグ情報表示 -->
   <div id="debug">デバッグ情報を表示中...</div>
+  
+  <!-- 開始／停止ボタン -->
   <button id="startBtn">カメラを開始</button>
+  <button id="stopBtn" style="display:none;">カメラを停止</button>
+  
+  <!-- カメラ映像エリア -->
   <div id="reader"></div>
+  
+  <!-- 操作ステータス -->
   <div id="status" class="status">カメラを開始してください</div>
+  
+  <!-- 読み取り値の表示 -->
   <div class="values">
     <p>バーコード①：<span id="code1">—</span></p>
     <p>バーコード②：<span id="code2">—</span></p>
   </div>
+  
+  <!-- 〇／× オーバーレイ -->
   <div id="overlay"></div>
 
   <script>
-    let code1 = null, code2 = null, html5QrCode = null, isScanning = false;
+    // グローバルエラーキャッチャー
+    window.addEventListener('error', event => {
+      addDebugLog(`Unhandled Error: ${event.message} (at ${event.filename}:${event.lineno})`);
+    });
+
+    let code1 = null, code2 = null;
+    let html5QrCode = null, isScanning = false;
+
+    const debugEl  = document.getElementById('debug');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn  = document.getElementById('stopBtn');
     const statusEl = document.getElementById('status');
     const code1El  = document.getElementById('code1');
     const code2El  = document.getElementById('code2');
     const overlayEl= document.getElementById('overlay');
-    const debugEl  = document.getElementById('debug');
-    const startBtn = document.getElementById('startBtn');
 
+    // デバッグログ出力
     function addDebugLog(msg) {
       const t = new Date().toLocaleTimeString();
       debugEl.textContent += `[${t}] ${msg}\n`;
@@ -122,13 +142,14 @@
       console.log(msg);
     }
 
+    // 環境チェック
     function checkEnvironment() {
       addDebugLog('=== 環境チェック開始 ===');
       addDebugLog(`URL: ${location.href}`);
       addDebugLog(`プロトコル: ${location.protocol}`);
       addDebugLog(`UA: ${navigator.userAgent}`);
       if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-        addDebugLog('警告: HTTPSではありません。');
+        addDebugLog('警告: HTTPSではありません。カメラが動作しない可能性あり。');
       }
       if (!navigator.mediaDevices?.getUserMedia) {
         addDebugLog('エラー: getUserMedia未サポート');
@@ -138,20 +159,24 @@
       return true;
     }
 
+    // カメラ一覧取得
     async function listCameras() {
       try {
         addDebugLog('カメラ検出中...');
         const devices = await navigator.mediaDevices.enumerateDevices();
         const cams = devices.filter(d => d.kind === 'videoinput');
         addDebugLog(`検出: ${cams.length}台`);
-        cams.forEach((c,i)=> addDebugLog(`  カメラ${i+1}: ${c.label||'Unknown'} (ID:${c.deviceId})`));
+        cams.forEach((c, i) => {
+          addDebugLog(`  カメラ${i+1}: ${c.label || 'Unknown'} (ID:${c.deviceId})`);
+        });
         return cams;
-      } catch(e) {
-        addDebugLog(`カメラ検出エラー: ${e}`);
+      } catch (e) {
+        addDebugLog(`カメラ検出エラー: ${e.message}`);
         return [];
       }
     }
 
+    // 画面・変数リセット
     function resetAll() {
       code1 = code2 = null;
       code1El.textContent = code2El.textContent = '—';
@@ -159,61 +184,82 @@
       statusEl.className = 'status';
     }
 
+    // バーコード内容の一時表示
     function showBarcodeContent(content, first) {
       overlayEl.textContent = content;
       overlayEl.className = 'barcode';
       overlayEl.style.display = 'flex';
-      addDebugLog((first?'1回目':'2回目') + `表示: ${content}`);
-      setTimeout(()=>{
-        overlayEl.style.display='none';
+      addDebugLog((first ? '1回目' : '2回目') + `表示: ${content}`);
+      setTimeout(() => {
+        overlayEl.style.display = 'none';
         if (!first) {
-          setTimeout(()=>{
-            const match = code1===code2;
-            addDebugLog(`照合: ${match?'一致':'不一致'}`);
+          setTimeout(() => {
+            const match = code1 === code2;
+            addDebugLog(`照合: ${match ? '一致' : '不一致'}`);
             showResult(match);
-          },200);
+          }, 200);
         }
-      },1000);
+      }, 1000);
     }
 
+    // 照合結果を大表示
     function showResult(match) {
       overlayEl.textContent = match ? '〇' : '×';
       overlayEl.className = 'result';
       overlayEl.style.color = match ? 'green' : 'red';
       overlayEl.style.display = 'flex';
-      setTimeout(()=>{
-        overlayEl.style.display='none';
+      setTimeout(() => {
+        overlayEl.style.display = 'none';
         resetAll();
-      },2000);
+      }, 2000);
     }
 
-    function onScanSuccess(text) {
-      addDebugLog(`読み取り成功: ${text}`);
+    // スキャン成功
+    function onScanSuccess(decodedText) {
+      addDebugLog(`読み取り成功: ${decodedText}`);
       if (code1 === null) {
-        code1 = text; code1El.textContent = text;
+        code1 = decodedText;
+        code1El.textContent = decodedText;
         statusEl.textContent = '２回目のスキャンをしてください';
         addDebugLog('1回目完了');
-        showBarcodeContent(text, true);
+        showBarcodeContent(decodedText, true);
       } else if (code2 === null) {
-        code2 = text; code2El.textContent = text;
+        code2 = decodedText;
+        code2El.textContent = decodedText;
         addDebugLog('2回目完了');
-        showBarcodeContent(text, false);
+        showBarcodeContent(decodedText, false);
       }
     }
 
-    function onScanFailure(err) {
-      addDebugLog(`読み取り失敗: ${err}`);
+    // スキャン失敗
+    function onScanFailure(error) {
+      addDebugLog(`読み取り失敗: ${error}`);
     }
 
+    // カメラ開始（前セッションのクリーンアップ含む）
     async function startScanner() {
-      if (isScanning) return addDebugLog('既にスキャン中');
       try {
-        addDebugLog('スキャン開始...');
+        if (html5QrCode && isScanning) {
+          addDebugLog('前のセッションを停止します');
+          await html5QrCode.stop();
+          html5QrCode.clear();
+          isScanning = false;
+        }
+
+        addDebugLog('スキャン開始処理...');
         if (!html5QrCode) {
           html5QrCode = new Html5Qrcode('reader');
-          addDebugLog('Html5Qrcode生成');
+          addDebugLog('Html5Qrcodeインスタンス生成');
         }
-        // ==== ここをQR & GS1限定型に絞る ====
+
+        // カメラ一覧から背面カメラを選択
+        const cams = await listCameras();
+        const backCam = cams.find(c => /背面|environment/i.test(c.label));
+        const cameraConfig = backCam
+          ? { deviceId: { exact: backCam.deviceId } }
+          : { facingMode: 'environment' };
+
+        // 読み取り設定（QR・GS1限定型のみ）
         const config = {
           fps: 12,
           qrbox: { width: 300, height: 300 },
@@ -223,42 +269,61 @@
           ],
           verbose: false
         };
-        addDebugLog('カメラ起動...');
+
         startBtn.disabled = true;
-        startBtn.textContent = '起動中...';
+        addDebugLog('html5QrCode.start 実行...');
         await html5QrCode.start(
-          { facingMode: 'environment' },
+          cameraConfig,
           config,
           onScanSuccess,
           onScanFailure
         );
+
         isScanning = true;
-        addDebugLog('起動成功');
+        addDebugLog('カメラ起動成功');
         statusEl.textContent = '１回目のスキャンをしてください';
         statusEl.className = 'status ok';
+
+        // ボタン表示切替
         startBtn.style.display = 'none';
+        stopBtn.style.display  = 'block';
         resetAll();
       } catch (e) {
         addDebugLog(`起動エラー: ${e.message}`);
         statusEl.textContent = `カメラエラー: ${e.message}`;
         statusEl.className = 'status ng';
         startBtn.disabled = false;
-        startBtn.textContent = 'カメラを開始';
       }
     }
 
+    // カメラ停止ボタン
+    stopBtn.addEventListener('click', async () => {
+      if (html5QrCode && isScanning) {
+        await html5QrCode.stop();
+        html5QrCode.clear();
+        isScanning = false;
+        addDebugLog('スキャンを停止しました');
+        // ボタン表示切替
+        stopBtn.style.display  = 'none';
+        startBtn.style.display = 'block';
+        startBtn.disabled      = false;
+        statusEl.textContent   = 'カメラを停止しました';
+        statusEl.className     = 'status';
+      }
+    });
+
+    // 初期化
     window.addEventListener('load', async () => {
-      addDebugLog('ページロード完了');
+      addDebugLog('ページ読み込み完了');
       if (typeof Html5Qrcode === 'undefined') {
-        addDebugLog('ライブラリ未ロード');
+        addDebugLog('ライブラリ未ロードエラー');
         statusEl.textContent = 'ライブラリ読み込みエラー';
-        statusEl.className = 'status ng';
+        statusEl.className   = 'status ng';
         return;
       }
-      addDebugLog('ライブラリ正常');
       if (!checkEnvironment()) {
         statusEl.textContent = 'ブラウザ未対応';
-        statusEl.className = 'status ng';
+        statusEl.className   = 'status ng';
         return;
       }
       await listCameras();
@@ -266,8 +331,11 @@
       addDebugLog('初期化完了');
     });
 
+    // ページ離脱時はストリーム停止
     window.addEventListener('beforeunload', () => {
-      if (html5QrCode && isScanning) html5QrCode.stop();
+      if (html5QrCode && isScanning) {
+        html5QrCode.stop();
+      }
     });
   </script>
 </body>
