@@ -342,7 +342,12 @@
         
         // 既存セッションのクリーンアップ
         if (html5QrCode && isScanning) {
-          await html5QrCode.stop();
+          try {
+            await html5QrCode.stop();
+            addDebugLog('🔄 前のセッションを停止');
+          } catch (e) {
+            addDebugLog(`⚠️ 停止エラー: ${e.message}`);
+          }
           isScanning = false;
         }
 
@@ -355,39 +360,25 @@
           addDebugLog('📹 Html5Qrcodeインスタンス作成');
         }
 
-        // カメラ設定（背面カメラ優先）
-        const cameraConfig = { 
-          facingMode: 'environment',
-          advanced: [
-            { focusMode: 'continuous' },
-            { zoom: 1.0 }
+        // シンプルなカメラ設定
+        const cameraConfig = { facingMode: 'environment' };
+
+        // 基本的なスキャン設定
+        const scanConfig = {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          // すべてのフォーマットを許可（問題の原因を特定するため）
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8
           ]
         };
 
-        // スキャン設定（最適化済み）
-        const scanConfig = {
-          fps: 15, // フレームレート向上
-          qrbox: function(viewfinderWidth, viewfinderHeight) {
-            // 動的サイズ調整
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            const qrboxSize = Math.floor(minEdge * 0.7);
-            return {
-              width: qrboxSize,
-              height: qrboxSize
-            };
-          },
-          aspectRatio: 1.0,
-          // QRコードとGS1限定型のみ
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.QR_CODE,
-            Html5QrcodeSupportedFormats.RSS_LIMITED
-          ],
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-          }
-        };
-
-        addDebugLog('📹 カメラ起動中...');
+        addDebugLog('📹 カメラ起動開始...');
+        addDebugLog(`設定: fps=${scanConfig.fps}, qrbox=${JSON.stringify(scanConfig.qrbox)}`);
+        
         await html5QrCode.start(
           cameraConfig,
           scanConfig,
@@ -407,15 +398,37 @@
         resetAll();
 
       } catch (error) {
-        addDebugLog(`❌ カメラ起動失敗: ${error.message}`);
+        // より詳細なエラー情報を表示
+        const errorDetails = {
+          name: error.name || 'Unknown',
+          message: error.message || 'Unknown error',
+          code: error.code || 'No code',
+          stack: error.stack ? error.stack.substring(0, 200) : 'No stack'
+        };
+        
+        addDebugLog(`❌ カメラ起動失敗:`);
+        addDebugLog(`  エラー名: ${errorDetails.name}`);
+        addDebugLog(`  メッセージ: ${errorDetails.message}`);
+        addDebugLog(`  コード: ${errorDetails.code}`);
+        addDebugLog(`  スタック: ${errorDetails.stack}`);
         
         let errorMessage = 'カメラエラーが発生しました';
+        
         if (error.name === 'NotAllowedError') {
-          errorMessage = 'カメラアクセスが拒否されました。ブラウザ設定を確認してください';
+          errorMessage = 'カメラアクセスが拒否されました';
+          addDebugLog('💡 解決策: ブラウザの設定でカメラアクセスを許可してください');
         } else if (error.name === 'NotFoundError') {
           errorMessage = 'カメラが見つかりません';
+          addDebugLog('💡 解決策: デバイスにカメラが接続されていることを確認してください');
         } else if (error.name === 'NotSupportedError') {
           errorMessage = 'このブラウザではカメラがサポートされていません';
+          addDebugLog('💡 解決策: 別のブラウザ（Chrome、Safari）をお試しください');
+        } else if (error.name === 'NotReadableError') {
+          errorMessage = 'カメラが他のアプリで使用中です';
+          addDebugLog('💡 解決策: 他のカメラアプリを閉じてから再試行してください');
+        } else if (errorDetails.message.includes('undefined')) {
+          errorMessage = 'ライブラリ初期化エラーです';
+          addDebugLog('💡 解決策: ページを再読み込みしてください');
         }
         
         statusEl.textContent = errorMessage;
@@ -463,6 +476,16 @@
         return;
       }
       addDebugLog('✅ Html5Qrcodeライブラリ読み込み成功');
+      
+      // サポートされているフォーマットをチェック
+      if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+        addDebugLog('✅ サポートフォーマット定義OK');
+        // 利用可能なフォーマットをログ出力
+        const formats = Object.keys(Html5QrcodeSupportedFormats);
+        addDebugLog(`📋 利用可能フォーマット数: ${formats.length}`);
+      } else {
+        addDebugLog('⚠️ サポートフォーマット定義なし');
+      }
 
       // 環境チェック
       if (!checkEnvironment()) {
