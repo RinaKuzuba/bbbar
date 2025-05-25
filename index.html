@@ -55,7 +55,7 @@
       font-size: 1rem;
     }
     .values p { margin: 0.25rem 0; }
-    /* 照合結果オーバーレイ */
+    /* オーバーレイ表示 */
     #overlay {
       display: none;
       position: fixed;
@@ -63,8 +63,22 @@
       background: rgba(255, 255, 255, 0.9);
       align-items: center;
       justify-content: center;
-      font-size: 8rem;
+      font-size: 4rem;
       z-index: 999;
+      text-align: center;
+      padding: 2rem;
+      box-sizing: border-box;
+    }
+    /* バーコード表示時 */
+    #overlay.barcode {
+      font-size: 2rem;
+      color: #333;
+      background: rgba(0, 123, 255, 0.9);
+      color: white;
+    }
+    /* 照合結果表示時 */
+    #overlay.result {
+      font-size: 8rem;
     }
     /* ボタン */
     button {
@@ -176,13 +190,38 @@
       statusEl.className = 'status';
     }
 
+    // バーコード内容を1秒間表示
+    function showBarcodeContent(content, isFirstScan) {
+      overlayEl.textContent = content;
+      overlayEl.className = 'barcode';
+      overlayEl.style.display = 'flex';
+      
+      addDebugLog(`${isFirstScan ? '1回目' : '2回目'}のバーコード内容を表示: ${content}`);
+      
+      setTimeout(() => {
+        overlayEl.style.display = 'none';
+        overlayEl.className = '';
+        
+        if (!isFirstScan) {
+          // 2回目の場合は、少し間を置いてから照合結果を表示
+          setTimeout(() => {
+            const isMatch = code1 === code2;
+            addDebugLog(`照合結果: ${isMatch ? '一致' : '不一致'}`);
+            showResult(isMatch);
+          }, 200);
+        }
+      }, 1000);
+    }
+
     // 結果を大きく表示して、2秒後にリセット
     function showResult(isMatch) {
       overlayEl.textContent = isMatch ? '〇' : '×';
+      overlayEl.className = 'result';
       overlayEl.style.color = isMatch ? 'green' : 'red';
       overlayEl.style.display = 'flex';
       setTimeout(() => {
         overlayEl.style.display = 'none';
+        overlayEl.className = '';
         resetAll();
       }, 2000);
     }
@@ -196,12 +235,17 @@
         code1El.textContent = code1;
         statusEl.textContent = '２回目のスキャンをしてください';
         addDebugLog('1回目のスキャン完了');
+        
+        // 1回目のバーコード内容を1秒間表示
+        showBarcodeContent(decodedText, true);
+        
       } else if (code2 === null) {
         code2 = decodedText;
         code2El.textContent = code2;
-        const isMatch = code1 === code2;
-        addDebugLog(`2回目のスキャン完了。照合結果: ${isMatch ? '一致' : '不一致'}`);
-        showResult(isMatch);
+        addDebugLog('2回目のスキャン完了');
+        
+        // 2回目のバーコード内容を1秒間表示してから照合結果表示
+        showBarcodeContent(decodedText, false);
       }
     }
 
